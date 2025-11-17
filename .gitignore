@@ -1,0 +1,37 @@
+# Google Calendar credentials and tokens
+credentials.json
+token.pickle
+
+# Authentication cookies
+cookie
+
+# Data folder contents
+data/
+logs/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+

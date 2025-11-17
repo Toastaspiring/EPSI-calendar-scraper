@@ -1,0 +1,77 @@
+name: Weekly Schedule Sync
+
+on:
+  # Run every Monday at 6:00 AM UTC
+  schedule:
+    - cron: '0 6 * * 1'
+
+  # Allow manual trigger from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  scrape-and-sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create cookie file from secrets
+        run: |
+          echo "${{ secrets.WIGOR_COOKIE }}" > cookie
+
+      - name: Create Google credentials from secrets
+        run: |
+          echo "${{ secrets.GOOGLE_CREDENTIALS }}" > credentials.json
+
+      - name: Restore Google token cache
+        uses: actions/cache@v3
+        with:
+          path: token.pickle
+          key: google-token-${{ runner.os }}
+
+      - name: Run schedule scraper
+        run: |
+          python main.py
+        env:
+          PYTHONUNBUFFERED: 1
+
+      - name: Upload log file
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: schedule-scraper-log-${{ github.run_number }}
+          path: logs/schedule_scraper.log
+          retention-days: 30
+
+      - name: Upload events JSON
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: events-json-${{ github.run_number }}
+          path: data/events.json
+          retention-days: 7
+
+      - name: Save Google token cache
+        if: success()
+        uses: actions/cache/save@v3
+        with:
+          path: token.pickle
+          key: google-token-${{ runner.os }}
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Schedule scraper failed. Check the logs for details."
+
