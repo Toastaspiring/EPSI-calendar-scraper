@@ -109,6 +109,7 @@ python main.py --help
 **GitHub Actions (Recommended)** ⭐
 - Runs automatically every Monday at 6 AM UTC
 - No local computer needed
+- Requires Google Secrets setup (see below)
 - See: [docs/GITHUB_ACTIONS_QUICKREF.md](docs/GITHUB_ACTIONS_QUICKREF.md)
 
 **Local Cron/Task Scheduler**
@@ -148,12 +149,32 @@ cat data/events.json   # Linux/Mac
 Get-Content data/events.json   # Windows
 ```
 
-## 🔒 Security
+## 🔒 Security & GitHub Actions Setup
 
-**Protected files (not in git):**
+To make the Google Calendar sync work in GitHub Actions (or any remote environment), you need to add a Secret.
+
+** Protected files (not in git):**
 - `cookie` - Authentication cookies
 - `credentials.json` - Google OAuth credentials
 - `token.pickle` - Google auth token
+
+** Setting up GitHub Secrets for Remote Sync:**
+
+1.  **Generate the Token Locally:**
+    Run the helper script on your local machine to login and generate the secret string.
+    ```bash
+    python scripts/generate_token.py
+    ```
+    *(Make sure you have `credentials.json` in the root directory first)*
+
+2.  **Add Secret to GitHub:**
+    - Go to your Repo Settings > Secrets and variables > Actions
+    - Create a new Repository Secret:
+        - Name: `GOOGLE_TOKEN_PICKLE_BASE64`
+        - Value: (Paste the long Base64 string output from the script)
+
+3.  **Done!**
+    The pipeline will now automatically restore your session and sync events to your calendar without needing a browser.
 - `data/` - Scraped data
 - `logs/` - Log files
 
