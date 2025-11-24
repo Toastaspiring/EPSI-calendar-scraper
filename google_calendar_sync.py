@@ -6,6 +6,7 @@ This module handles authentication and syncing of events to Google Calendar.
 
 import json
 import os
+import base64
 from datetime import datetime, timezone
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -26,10 +27,34 @@ def authenticate_google_calendar():
     """
     creds = None
 
+    # Check for environment variables and create files if they don't exist
+    if not os.path.exists('token.pickle') and os.environ.get('GOOGLE_TOKEN_PICKLE_BASE64'):
+        try:
+            token_data = base64.b64decode(os.environ['GOOGLE_TOKEN_PICKLE_BASE64'])
+            with open('token.pickle', 'wb') as token:
+                token.write(token_data)
+            logging.info("Restored token.pickle from environment variable")
+        except Exception as e:
+            logging.error(f"Failed to decode GOOGLE_TOKEN_PICKLE_BASE64: {e}")
+
+    if not os.path.exists('credentials.json') and os.environ.get('GOOGLE_CREDENTIALS_JSON_BASE64'):
+        try:
+            creds_data = base64.b64decode(os.environ['GOOGLE_CREDENTIALS_JSON_BASE64'])
+            with open('credentials.json', 'wb') as f:
+                f.write(creds_data)
+            logging.info("Restored credentials.json from environment variable")
+        except Exception as e:
+            logging.error(f"Failed to decode GOOGLE_CREDENTIALS_JSON_BASE64: {e}")
+
     # The file token.pickle stores the user's access and refresh tokens
     if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
+        try:
+            with open('token.pickle', 'rb') as token:
+                creds = pickle.load(token)
+        except Exception as e:
+            logging.error(f"Error loading token.pickle: {e}")
+            # If token is corrupted, we might want to delete it or just ignore it
+            creds = None
 
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
