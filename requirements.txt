@@ -8,3 +8,6 @@ google-auth-oauthlib>=1.1.0
 google-auth-httplib2>=0.1.1
 google-api-python-client>=2.100.0
 
+# Outlook Calendar API dependencies (optional)
+O365>=2.0.26
+pytz

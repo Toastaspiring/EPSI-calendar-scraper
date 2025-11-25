@@ -256,7 +256,9 @@ if __name__ == '__main__':
 
     # Parse command-line arguments
     parser = argparse.ArgumentParser(description='Scrape schedule and optionally sync to Google Calendar')
-    parser.add_argument('--no-sync', action='store_true', help='Skip Google Calendar sync')
+    parser.add_argument('--no-sync', action='store_true', help='Skip all sync operations')
+    parser.add_argument('--no-google-sync', action='store_true', help='Skip Google Calendar sync')
+    parser.add_argument('--sync-outlook', action='store_true', help='Enable Outlook Calendar sync')
     parser.add_argument('--sync-only', action='store_true', help='Only sync existing events.json, skip scraping')
     args = parser.parse_args()
 
@@ -270,23 +272,38 @@ if __name__ == '__main__':
             save_events_to_json(events)
             logging.info("Scraping completed successfully")
 
-        # Sync to Google Calendar (unless --no-sync flag is set)
         if not args.no_sync:
-            try:
-                from google_calendar_sync import sync_events_to_calendar
+            # Sync to Google Calendar
+            if not args.no_google_sync:
+                try:
+                    from google_calendar_sync import sync_events_to_calendar
 
-                logging.info("Starting Google Calendar sync...")
-                # Events now have individual dates, no need to ask
-                created_count = sync_events_to_calendar()
-                logging.info(f"Google Calendar sync completed: {created_count} events created")
-            except ImportError:
-                logging.error("Google Calendar module not available.")
-                logging.error("Install required packages: pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client")
-            except Exception as e:
-                logging.error(f"Error syncing to Google Calendar: {e}")
-                raise
+                    logging.info("Starting Google Calendar sync...")
+                    # Events now have individual dates, no need to ask
+                    created_count = sync_events_to_calendar()
+                    logging.info(f"Google Calendar sync completed: {created_count} events created")
+                except ImportError:
+                    logging.error("Google Calendar module not available.")
+                    logging.error("Install required packages: pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client")
+                except Exception as e:
+                    logging.error(f"Error syncing to Google Calendar: {e}")
+                    # We continue to Outlook sync even if Google fails
+
+            # Sync to Outlook Calendar
+            if args.sync_outlook or os.environ.get('OUTLOOK_CLIENT_ID'):
+                try:
+                    from outlook_calendar_sync import sync_events_to_calendar as sync_outlook_events
+
+                    logging.info("Starting Outlook Calendar sync...")
+                    created_count = sync_outlook_events()
+                    logging.info(f"Outlook Calendar sync completed: {created_count} events created")
+                except ImportError:
+                    logging.error("Outlook Calendar module not available.")
+                    logging.error("Install required packages: pip install O365")
+                except Exception as e:
+                    logging.error(f"Error syncing to Outlook Calendar: {e}")
         else:
-            logging.info("Skipping Google Calendar sync (--no-sync flag set)")
+            logging.info("Skipping sync operations (--no-sync flag set)")
 
         logging.info("All operations completed successfully")
         sys.exit(0)
