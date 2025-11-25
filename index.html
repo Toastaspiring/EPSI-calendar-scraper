@@ -30,10 +30,13 @@
             </div>
             <div class="form-group">
                 <label for="proxy">CORS Proxy (Optional)</label>
-                <input type="text" id="proxy" name="proxy" value="https://corsproxy.io/?">
-                <div class="hint" style="color: #d93025;">
-                    Warning: Using a public proxy sends your credentials through a third party.
-                    Use "Paste HTML Source" below for better security.
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="proxy" name="proxy" placeholder="https://corsproxy.io/?" style="flex: 1;">
+                    <button type="button" id="use-proxy-btn" class="secondary-btn" style="width: auto; padding: 0.5rem;">Use Demo Proxy</button>
+                </div>
+                <div class="hint">
+                    Leave empty for direct connection. If blocked by CORS, try a proxy.
+                    <span style="color: #d93025;">Warning: Proxies see your traffic.</span>
                 </div>
             </div>
             <button type="submit" id="loginBtn">Login & Load Schedule</button>

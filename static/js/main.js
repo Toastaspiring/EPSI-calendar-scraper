@@ -35,6 +35,10 @@ document.addEventListener('DOMContentLoaded', () => {
         loginForm.reset();
     });
 
+    document.getElementById('use-proxy-btn').addEventListener('click', () => {
+        document.getElementById('proxy').value = 'https://corsproxy.io/?';
+    });
+
     // --- Login Logic ---
 
     loginForm.addEventListener('submit', async (e) => {
