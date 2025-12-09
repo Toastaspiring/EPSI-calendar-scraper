@@ -34,21 +34,25 @@ jobs:
           pip install -r requirements.txt
 
       - name: Generate fresh cookies via automated login
+        env:
+          WIGOR_USERNAME: ${{ secrets.WIGOR_USERNAME }}
+          WIGOR_PASSWORD: ${{ secrets.WIGOR_PASSWORD }}
+          WIGOR_COOKIE: ${{ secrets.WIGOR_COOKIE }}
         run: |
           # Ensure data directory exists
           mkdir -p data
 
           # Create input for automated login script
-          echo "${{ secrets.WIGOR_USERNAME }}" > /tmp/login_input.txt
-          echo "${{ secrets.WIGOR_PASSWORD }}" >> /tmp/login_input.txt
+          echo "$WIGOR_USERNAME" > /tmp/login_input.txt
+          echo "$WIGOR_PASSWORD" >> /tmp/login_input.txt
           echo "y" >> /tmp/login_input.txt
           
           # Run automated login
           cat /tmp/login_input.txt | python scripts/wigor_login.py || {
             echo "Automated login failed, checking for fallback cookie secret"
-            if [ -n "${{ secrets.WIGOR_COOKIE }}" ]; then
+            if [ -n "$WIGOR_COOKIE" ]; then
               echo "Using fallback cookie from secrets"
-              echo "${{ secrets.WIGOR_COOKIE }}" > data/cookie
+              echo "$WIGOR_COOKIE" > data/cookie
             else
               echo "ERROR: Both automated login and fallback cookie failed"
               exit 1
@@ -66,9 +70,11 @@ jobs:
           ls -R data/ || echo "Data directory not found"
 
       - name: Create Google credentials from secrets
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
         run: |
           mkdir -p data
-          echo "${{ secrets.GOOGLE_CREDENTIALS }}" > data/credentials.json
+          echo "$GOOGLE_CREDENTIALS" > data/credentials.json
 
       - name: Restore Google token cache
         uses: actions/cache@v3
