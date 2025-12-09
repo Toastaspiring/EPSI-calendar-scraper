@@ -1,160 +1,63 @@
-# Quick Start Guide - Google Calendar Integration
+# 🚀 Quick Start: Automated Schedule Sync
 
-## TL;DR - Get Started in 5 Minutes
+**The "Happy Path" to getting your schedule properly synced automatically every week using GitHub Actions.**
 
-### 1. Install Dependencies
-```powershell
-pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
+This guide assumes you want a **Set It and Forget It** solution. We will use GitHub Actions to run the scraper every Monday morning.
+
+---
+
+## ✅ Prerequisites
+1.  **GitHub Account**
+2.  **WigorServices Credentials** (Username & Password)
+3.  **Google Cloud Credentials** (for Calendar Sync)
+    *   *If you haven't created these yet, see the [Setup Guide in documentation.md](documentation.md#3-google-cloud-setup-one-time).*
+
+---
+
+## ⚡ Setup Steps (5 Minutes)
+
+### 1. Push to GitHub
+If you haven't already, push this code to a new private GitHub repository.
+```bash
+git init
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/REPO_NAME.git
+git push -u origin main
 ```
 
-### 2. Get Google Calendar Credentials
+### 2. Configure Secrets
+Go to your repository on GitHub:
+1.  Click **Settings** (top bar).
+2.  Click **Secrets and variables** -> **Actions** (left sidebar).
+3.  Click **New repository secret**.
 
-**Fast Track:**
-1. Go to: https://console.cloud.google.com/
-2. Create new project
-3. Enable "Google Calendar API"
-4. Create OAuth credentials (Desktop app)
-5. Download as `credentials.json` → save in project folder
+Add the following 3 secrets:
 
-**Detailed Guide:** See `GOOGLE_CALENDAR_SETUP.md`
+| Secret Name | Value |
+| :--- | :--- |
+| `WIGOR_USERNAME` | Your Wigor username (e.g., `louis.marec`) |
+| `WIGOR_PASSWORD` | Your Wigor password |
+| `GOOGLE_CREDENTIALS` | The content of your `credentials.json` file |
 
-### 3. Run the Script
-```powershell
-python main.py
-```
-
-When prompted:
-- Type `y` to sync to Google Calendar
-- Enter date (e.g., `11/17/2025`)
-- Authorize in browser (first time only)
-
-### 4. Check Your Calendar
-Open https://calendar.google.com/ - your events should be there!
+### 3. Trigger the Workflow
+1.  Go to the **Actions** tab in your repository.
+2.  Select **Weekly Schedule Sync** from the left sidebar.
+3.  Click **Run workflow** (blue button).
 
 ---
 
-## What You'll See
-
-The script will:
-1. ✓ Scrape your schedule
-2. ✓ Extract 13+ events
-3. ✓ Ask if you want to sync
-4. ✓ Open browser for Google auth (first time)
-5. ✓ Create events in your calendar
-6. ✓ Show success message
+## 🎉 What Happens Next?
+1.  **Authentication**: The action spins up a virtual browser, logs in as you, and grabs fresh cookies.
+2.  **Scraping**: It fetches your schedule for the current week.
+3.  **Sync**: It uploads the events to your Google Calendar.
+4.  **Repeat**: This will now happen **automatically every Monday at 6:00 AM UTC**.
 
 ---
 
-## Alternative: Sync Only (No Scraping)
+## 🔍 Verification
+*   **Check Calendar**: Open Google Calendar and look for your courses.
+*   **Check Logs**: click on the specific run in the "Actions" tab to see detailed logs if something goes wrong.
 
-If you already have `events.json`:
-
-```powershell
-python google_calendar_sync.py 11/17/2025
-```
-
----
-
-## Troubleshooting
-
-### "credentials.json not found"
-→ You need to create OAuth credentials first
-→ See `GOOGLE_CALENDAR_SETUP.md` Step 2-3
-
-### Browser doesn't open
-→ Copy URL from terminal and paste in browser
-
-### "Access blocked"
-→ Add yourself as test user in OAuth consent screen
-
----
-
-## Next Time
-
-After first setup, just run:
-```powershell
-python main.py
-```
-
-No browser popup needed - it remembers your authentication!
-
----
-
-## What Gets Added to Calendar
-
-Each event includes:
-- 📚 **Course name** as title
-- 📍 **Room** as location
-- 👨‍🏫 **Professor** in description
-- ⏰ **Exact times**
-- 🔔 **Reminders** (30 min & 10 min before)
-- 🎨 **Color coding** by type
-- 🔗 **Teams links** (if available)
-
----
-
-## Files You Need
-
-| File | What is it | Where to get it |
-|------|-----------|-----------------|
-| `credentials.json` | OAuth credentials | Download from Google Cloud Console |
-| `cookie` | Schedule auth cookies | Copy from browser (already have) |
-| `token.pickle` | Google auth token | Created automatically on first run |
-
----
-
-## Quick Commands
-
-```powershell
-# Full workflow (scrape + sync)
-python main.py
-
-# Sync existing events
-python google_calendar_sync.py 11/17/2025
-
-# Just scrape (no calendar)
-python main.py
-# (Press 'n' when asked about Google Calendar)
-
-# Install everything
-pip install -r requirements.txt
-```
-
----
-
-## Common Workflow
-
-**Weekly schedule update:**
-```powershell
-# Update cookie in browser first if expired
-python main.py
-# Type 'y' for calendar sync
-# Enter this week's date
-```
-
-**Done!** Check Google Calendar app on phone/computer.
-
----
-
-## Need Help?
-
-1. **Detailed setup**: Read `GOOGLE_CALENDAR_SETUP.md`
-2. **General usage**: Read `README.md`
-3. **Can't find credentials.json**: You need to create it (Step 2 above)
-
----
-
-## Pro Tips
-
-💡 **Run weekly** to keep calendar updated
-💡 **Use same Google account** on phone for mobile sync
-💡 **Set up recurring** with Windows Task Scheduler
-💡 **Different calendar?** Modify `calendarId` in `google_calendar_sync.py`
-💡 **Delete all events?** Use Google Calendar web interface bulk delete
-
----
-
-## That's It!
-
-You're all set. Your schedule will now automatically sync to Google Calendar! 🎉
-
+> **Need to debug?** Check [docs/documentation.md](documentation.md) for detailed troubleshooting.
