@@ -5,12 +5,6 @@ on:
   schedule:
     - cron: '0 6 * * 1'
 
-  # Run on push to main/master branches for testing
-  push:
-    branches:
-      - main
-      - master
-
   # Allow manual trigger from GitHub Actions tab
   workflow_dispatch:
 
