@@ -35,20 +35,40 @@ Go to your repository on GitHub:
 
 Add the following 4 secrets:
 
+### Secrets Configuration
+You need to set up secrets depending on your provider (Google or Outlook).
+
+**Common Secrets (Required for both):**
 | Secret Name | Value | Description |
 | :--- | :--- | :--- |
 | `WIGOR_USERNAME` | Your Wigor username | E.g. `louis.marec` |
 | `WIGOR_PASSWORD` | Your Wigor password | |
-| `GOOGLE_CREDENTIALS` | Content of `credentials.json` | Downloaded from Google Cloud |
+| `CALENDAR_PROVIDER` | `GOOGLE`, `OUTLOOK`, or `BOTH` | Default is `GOOGLE` |
+
+#### Option A: Google Calendar Secrets
+| Secret Name | Value | Description |
+| :--- | :--- | :--- |
+| `GOOGLE_CREDENTIALS` | Content of `credentials.json` | *See docs for setup* |
 | `GOOGLE_TOKEN_BASE64` | Base64 encoded `token.pickle` | **See below** |
 
-#### How to get `GOOGLE_TOKEN_BASE64`
-Since GitHub servers can't open a browser window to ask for permission, you must do it once locally and upload the "permission slip".
+#### Option B: Outlook Calendar Secrets
+| Secret Name | Value | Description |
+| :--- | :--- | :--- |
+| `MS_CLIENT_ID` | Application (Client) ID | From Azure Portal |
+| `MS_CLIENT_SECRET` | Client Secret Value | From Azure Portal |
+| `MS_TOKEN_BASE64` | Base64 encoded `o365_token.txt` | **See below** |
 
-1.  Run the script locally once to generate `data/token.pickle`.
-2.  Run this PowerShell command to convert it to text:
+#### How to get the `*_TOKEN_BASE64` secret
+Since GitHub servers can't open a browser, you must authenticate locally first.
+
+1.  Run the script locally to generate the token file (`data/token.pickle` for Google, `data/o365_token.txt` for Outlook).
+2.  Run this PowerShell command to convert it:
     ```powershell
+    # For Google
     [Convert]::ToBase64String([IO.File]::ReadAllBytes('data/token.pickle'))
+
+    # For Outlook
+    [Convert]::ToBase64String([IO.File]::ReadAllBytes('data/o365_token.txt'))
     ```
 3.  Copy the huge string output and paste it as the secret value.
 
