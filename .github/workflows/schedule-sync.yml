@@ -5,12 +5,6 @@ on:
   schedule:
     - cron: '0 6 * * 1'
 
-  # Run on push to main/master branches for testing
-  push:
-    branches:
-      - main
-      - master
-
   # Allow manual trigger from GitHub Actions tab
   workflow_dispatch:
 
@@ -61,13 +55,6 @@ jobs:
           
           # Clean up temporary file
           rm -f /tmp/login_input.txt
-
-      - name: Debug - List data directory
-        run: |
-          echo "Listing current directory:"
-          ls -la
-          echo "Listing data directory:"
-          ls -R data/ || echo "Data directory not found"
 
       - name: Create Google credentials from secrets
         env:
