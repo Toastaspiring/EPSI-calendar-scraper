@@ -4,9 +4,10 @@
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![GitHub Actions](https://img.shields.io/badge/github%20actions-automated-green.svg)
+![Outlook](https://img.shields.io/badge/Outlook-Supported-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)
 
-**A robust, automated solution to sync your EPSI/WIS schedule directly to Google Calendar.**
+**A robust, automated solution to sync your EPSI/WIS schedule directly to Google or Outlook Calendar.**
 
 [Getting Started](docs/QUICKSTART.md) • [Documentation](docs/documentation.md) • [Troubleshooting](docs/documentation.md#-troubleshooting)
 
@@ -23,7 +24,7 @@ Designed to be **"Set and Forget"**, it runs automatically via GitHub Actions ev
 ## Key Features
 
 *   **Automated Authentication**: Handles login via Selenium with headless browser support.
-*   **Intelligent Sync**: Parses complex HTML schedules and maps them to Google Calendar events.
+*   **Intelligent Sync**: Parses complex HTML schedules and maps them to Google/Outlook events.
 *   **Rich Event Details**: Includes Class Name, Professor, Room Location, and clickable Teams links.
 *   **CI/CD Ready**: Pre-configured GitHub Actions workflow for zero-touch weekly automation.
 *   **Robust Error Handling**: Auto-detects expired sessions and handles connection retries.
@@ -33,7 +34,7 @@ Designed to be **"Set and Forget"**, it runs automatically via GitHub Actions ev
 The fastest way to use this tool is via **GitHub Actions** (Cloud automation).
 
 1.  **Fork/Clone** this repository.
-2.  **Configure Secrets** (Wigor Credentials & Google OAuth).
+2.  **Configure Secrets** (Wigor Credentials & Calendar API).
 3.  **Enable the Workflow**.
 
 **[Read the 5-Minute Setup Guide](docs/QUICKSTART.md)**

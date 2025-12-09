@@ -8,7 +8,8 @@
 1. [Project Overview](#-project-overview)
 2. [Setup Guide (Local & Google Cloud)](#-setup-guide)
 3. [Technical Guide (API & Integration)](#-technical-guide)
-4. [Troubleshooting](#-troubleshooting)
+4. [Outlook Integration](#-outlook-integration)
+5. [Troubleshooting](#-troubleshooting)
 
 ---
 
@@ -20,7 +21,7 @@ This tool scrapes your schedule from the WigorServices EDT (timetable) system an
 - **Fetch schedule page**: Authenticates via cookies or auto-login.
 - **Extract events**: KPI-driven parsing of HTML schedule.
 - **Export to JSON**: Structured data for easy processing.
-- **Google Calendar Sync**: Automatically pushes events to your calendar.
+- **Google/Outlook Sync**: Automatically pushes events to your Google or Outlook Calendar.
 - **Teams Links**: Preserves Microsoft Teams meeting links.
 
 ### Project Structure
@@ -29,7 +30,8 @@ PythonProject2/
 ├── main.py                      # Main scraper script
 ├── scripts/
 │   ├── wigor_login.py           # Auto-login & Cookie generation
-│   └── google_calendar_sync.py  # Standalone sync script
+│   ├── google_calendar_sync.py  # Google Sync script
+│   └── outlook_calendar_sync.py # Outlook Sync script
 ├── .github/workflows/           # Automation
 ├── data/                        # JSON & Raw HTML output
 ├── logs/                        # Execution logs
@@ -122,6 +124,74 @@ You can import the logic into your own scripts:
 from scripts.wigor_login import setup_driver, perform_login
 # ... (See scripts/wigor_login.py for full code)
 ```
+
+### Options
+*   `--no-sync`: Skip calendar sync entirely.
+*   `--provider`: Choose `GOOGLE`, `OUTLOOK`, or `BOTH`.
+
+---
+
+## 4. Outlook Setup (One-Time)
+
+To sync your schedule with Microsoft Outlook, you need to register an "App" in **Microsoft Azure** to get a Client ID and Secret.
+
+### 4.1 Register App in Azure Portal
+
+1.  Go to the [Azure Portal - App Registrations](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade).
+2.  Log in with your Microsoft account (the same one you use for Outlook).
+3.  Click **New Registration**.
+4.  **Name**: `Schedule Scraper` (or any name you like).
+5.  **Supported Account Types**: Select **"Accounts in any organizational directory (Any Azure AD directory - Multitenant) and personal Microsoft accounts (e.g. Skype, Xbox)"**.
+    *   *Note: This is critical for personal Outlook accounts.*
+6.  **Redirect URI**:
+    *   Platform: **Web**
+    *   URI: `https://login.microsoftonline.com/common/oauth2/nativeclient`
+7.  Click **Register**.
+
+### 4.2 Get Client ID & Secret
+
+Once created, you will be on the Overview page.
+
+1.  **Client ID**: Copy the **Application (client) ID**. This is your `MS_CLIENT_ID`.
+2.  **Client Secret**:
+    *   Click **Certificates & secrets** (left sidebar).
+    *   Click **New client secret**.
+    *   Description: `Scraper Secret`
+    *   Expires: `24 months` (or custom).
+    *   Click **Add**.
+    *   **COPY THE VALUE NOW**. You won't see it again. This is your `MS_CLIENT_SECRET`.
+
+### 4.3 Configure Permissions (Scopes)
+
+1.  Click **API Permissions** (left sidebar).
+2.  Click **Add a permission**.
+3.  Select **Microsoft Graph**.
+4.  Select **Delegated permissions**.
+5.  Search for and check: `Calendars.ReadWrite`.
+6.  Click **Add permissions**.
+
+### 4.4 Run Locally to Generate Token
+
+Similar to Google, you need to authenticate once locally to generate a token for the headless GitHub Action.
+
+1.  Set your credentials in your terminal:
+    ```powershell
+    $env:MS_CLIENT_ID="your_client_id_here"
+    $env:MS_CLIENT_SECRET="your_client_secret_here"
+    ```
+2.  Run the sync script (it handles auth if not found):
+    ```bash
+    python main.py --sync-only --provider OUTLOOK
+    ```
+3.  Follow the link in the terminal, login, and copy the return URL back to the terminal.
+4.  **Success!** A file `data/o365_token.txt` will be created.
+
+### 4.5 Get the Base64 Token for GitHub
+Run this in PowerShell after generating the token file:
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('data/o365_token.txt'))
+```
+Use this value for the `MS_TOKEN_BASE64` secret.
 
 ---
 
