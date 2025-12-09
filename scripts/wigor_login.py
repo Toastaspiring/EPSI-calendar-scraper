@@ -26,8 +26,8 @@ logging.basicConfig(
 # Configuration
 WIGOR_URL = "https://ws-edt-cd.wigorservices.net/WebPsDyn.aspx?Action=posEDTLMS&serverID=C&Tel=louis.marec"
 CAS_LOGIN_URL = "https://cas-p.wigorservices.net/cas/login"
-COOKIE_FILE = "cookie"
-COOKIE_JSON_FILE = "cookies_full.json"
+COOKIE_FILE = "data/cookie"
+COOKIE_JSON_FILE = "data/cookies_full.json"
 
 
 def setup_driver(headless=False):
@@ -202,6 +202,10 @@ def save_cookies(all_cookies, important_cookies):
         all_cookies: List of all cookies
         important_cookies: Dictionary of important cookies
     """
+    # Ensure data directory exists
+    import os
+    os.makedirs('data', exist_ok=True)
+
     # Save all cookies as JSON (for reference)
     with open(COOKIE_JSON_FILE, 'w') as f:
         json.dump(all_cookies, f, indent=2)

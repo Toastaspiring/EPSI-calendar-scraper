@@ -29,6 +29,9 @@ jobs:
 
       - name: Generate fresh cookies via automated login
         run: |
+          # Ensure data directory exists
+          mkdir -p data
+
           # Create input for automated login script
           echo "${{ secrets.WIGOR_USERNAME }}" > /tmp/login_input.txt
           echo "${{ secrets.WIGOR_PASSWORD }}" >> /tmp/login_input.txt
@@ -39,7 +42,7 @@ jobs:
             echo "Automated login failed, checking for fallback cookie secret"
             if [ -n "${{ secrets.WIGOR_COOKIE }}" ]; then
               echo "Using fallback cookie from secrets"
-              echo "${{ secrets.WIGOR_COOKIE }}" > cookie
+              echo "${{ secrets.WIGOR_COOKIE }}" > data/cookie
             else
               echo "ERROR: Both automated login and fallback cookie failed"
               exit 1
@@ -51,12 +54,13 @@ jobs:
 
       - name: Create Google credentials from secrets
         run: |
-          echo "${{ secrets.GOOGLE_CREDENTIALS }}" > credentials.json
+          mkdir -p data
+          echo "${{ secrets.GOOGLE_CREDENTIALS }}" > data/credentials.json
 
       - name: Restore Google token cache
         uses: actions/cache@v3
         with:
-          path: token.pickle
+          path: data/token.pickle
           key: google-token-${{ runner.os }}
 
       - name: Run schedule scraper
@@ -85,7 +89,7 @@ jobs:
         if: success()
         uses: actions/cache/save@v3
         with:
-          path: token.pickle
+          path: data/token.pickle
           key: google-token-${{ runner.os }}
 
       - name: Notify on failure

@@ -27,8 +27,8 @@ def authenticate_google_calendar():
     creds = None
 
     # The file token.pickle stores the user's access and refresh tokens
-    if os.path.exists('../data/token.pickle'):
-        with open('../data/token.pickle', 'rb') as token:
+    if os.path.exists('data/token.pickle'):
+        with open('data/token.pickle', 'rb') as token:
             creds = pickle.load(token)
 
     # If there are no (valid) credentials available, let the user log in.
@@ -36,22 +36,22 @@ def authenticate_google_calendar():
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            if not os.path.exists('../data/credentials.json'):
+            if not os.path.exists('data/credentials.json'):
                 logging.error("credentials.json not found!")
                 logging.error("To set up Google Calendar integration:")
                 logging.error("1. Go to https://console.cloud.google.com/")
                 logging.error("2. Create a new project or select existing one")
                 logging.error("3. Enable Google Calendar API")
                 logging.error("4. Create OAuth 2.0 credentials (Desktop app)")
-                logging.error("5. Download the credentials and save as 'credentials.json'")
+                logging.error("5. Download the credentials and save as 'data/credentials.json'")
                 return None
 
             flow = InstalledAppFlow.from_client_secrets_file(
-                '../data/credentials.json', SCOPES)
+                'data/credentials.json', SCOPES)
             creds = flow.run_local_server(port=0)
 
         # Save the credentials for the next run
-        with open('../data/token.pickle', 'wb') as token:
+        with open('data/token.pickle', 'wb') as token:
             pickle.dump(creds, token)
 
     service = build('calendar', 'v3', credentials=creds)
