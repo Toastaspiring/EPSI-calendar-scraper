@@ -4,7 +4,7 @@
 
 ---
 
-## 📚 Table of Contents
+## Table of Contents
 1. [Project Overview](#-project-overview)
 2. [Setup Guide (Local & Google Cloud)](#-setup-guide)
 3. [Technical Guide (API & Integration)](#-technical-guide)
@@ -12,7 +12,7 @@
 
 ---
 
-## 🔭 Project Overview
+## Project Overview
 
 This tool scrapes your schedule from the WigorServices EDT (timetable) system and extracts all calendar events. It can run locally or automatically in the cloud via GitHub Actions.
 
@@ -38,7 +38,7 @@ PythonProject2/
 
 ---
 
-## 🛠 Setup Guide
+## Setup Guide
 
 ### 1. Prerequisites
 - **Python 3.7+**
@@ -90,7 +90,7 @@ If auto-login fails, you can manually get cookies:
 
 ---
 
-## ⚙ Technical Guide
+## Technical Guide
 
 ### API Documentation
 The scraper interacts with WigorServices via HTTP requests mimicking a browser.
@@ -125,7 +125,7 @@ from scripts.wigor_login import setup_driver, perform_login
 
 ---
 
-## ❓ Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -139,7 +139,8 @@ from scripts.wigor_login import setup_driver, perform_login
 
 #### GitHub Action Fails
 *   **Cause**: Secrets might be missing or incorrect.
-*   **Fix**: Check Settings -> Secrets. You need `WIGOR_USERNAME`, `WIGOR_PASSWORD`, and `GOOGLE_CREDENTIALS`.
+*   **Fix**: Check Settings -> Secrets. You need `WIGOR_USERNAME`, `WIGOR_PASSWORD`, `GOOGLE_CREDENTIALS`, and **`GOOGLE_TOKEN_BASE64`**.
+    *   *See [QUICKSTART.md](QUICKSTART.md) for how to generate the base64 token.*
 
 #### "Review blocked by Google" during Auth
 *   **Cause**: The app is unverified (normal for personal projects).

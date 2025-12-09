@@ -1,4 +1,4 @@
-# 🚀 Quick Start: Automated Schedule Sync
+# Quick Start: Automated Schedule Sync
 
 **The "Happy Path" to getting your schedule properly synced automatically every week using GitHub Actions.**
 
@@ -6,7 +6,7 @@ This guide assumes you want a **Set It and Forget It** solution. We will use Git
 
 ---
 
-## ✅ Prerequisites
+## Prerequisites
 1.  **GitHub Account**
 2.  **WigorServices Credentials** (Username & Password)
 3.  **Google Cloud Credentials** (for Calendar Sync)
@@ -14,7 +14,7 @@ This guide assumes you want a **Set It and Forget It** solution. We will use Git
 
 ---
 
-## ⚡ Setup Steps (5 Minutes)
+## Setup Steps (5 Minutes)
 
 ### 1. Push to GitHub
 If you haven't already, push this code to a new private GitHub repository.
@@ -33,13 +33,24 @@ Go to your repository on GitHub:
 2.  Click **Secrets and variables** -> **Actions** (left sidebar).
 3.  Click **New repository secret**.
 
-Add the following 3 secrets:
+Add the following 4 secrets:
 
-| Secret Name | Value |
-| :--- | :--- |
-| `WIGOR_USERNAME` | Your Wigor username (e.g., `louis.marec`) |
-| `WIGOR_PASSWORD` | Your Wigor password |
-| `GOOGLE_CREDENTIALS` | The content of your `credentials.json` file |
+| Secret Name | Value | Description |
+| :--- | :--- | :--- |
+| `WIGOR_USERNAME` | Your Wigor username | E.g. `louis.marec` |
+| `WIGOR_PASSWORD` | Your Wigor password | |
+| `GOOGLE_CREDENTIALS` | Content of `credentials.json` | Downloaded from Google Cloud |
+| `GOOGLE_TOKEN_BASE64` | Base64 encoded `token.pickle` | **See below** |
+
+#### How to get `GOOGLE_TOKEN_BASE64`
+Since GitHub servers can't open a browser window to ask for permission, you must do it once locally and upload the "permission slip".
+
+1.  Run the script locally once to generate `data/token.pickle`.
+2.  Run this PowerShell command to convert it to text:
+    ```powershell
+    [Convert]::ToBase64String([IO.File]::ReadAllBytes('data/token.pickle'))
+    ```
+3.  Copy the huge string output and paste it as the secret value.
 
 ### 3. Trigger the Workflow
 1.  Go to the **Actions** tab in your repository.
@@ -48,7 +59,7 @@ Add the following 3 secrets:
 
 ---
 
-## 🎉 What Happens Next?
+## What Happens Next?
 1.  **Authentication**: The action spins up a virtual browser, logs in as you, and grabs fresh cookies.
 2.  **Scraping**: It fetches your schedule for the current week.
 3.  **Sync**: It uploads the events to your Google Calendar.
@@ -56,7 +67,7 @@ Add the following 3 secrets:
 
 ---
 
-## 🔍 Verification
+## Verification
 *   **Check Calendar**: Open Google Calendar and look for your courses.
 *   **Check Logs**: click on the specific run in the "Actions" tab to see detailed logs if something goes wrong.
 
