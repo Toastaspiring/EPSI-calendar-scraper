@@ -52,6 +52,13 @@ jobs:
           # Clean up temporary file
           rm -f /tmp/login_input.txt
 
+      - name: Debug - List data directory
+        run: |
+          echo "Listing current directory:"
+          ls -la
+          echo "Listing data directory:"
+          ls -R data/ || echo "Data directory not found"
+
       - name: Create Google credentials from secrets
         run: |
           mkdir -p data
