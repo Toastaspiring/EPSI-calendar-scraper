@@ -1,9 +1,13 @@
 # Google Calendar credentials and tokens
-credentials.json
-token.pickle
+data/credentials.json
+data/token.pickle
 
 # Authentication cookies
-cookie
+data/cookie
+data/cookies_full.json
+
+# Test files with credentials
+tests/test_login.py
 
 # Data folder contents
 data/

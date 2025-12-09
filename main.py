@@ -20,11 +20,13 @@ logging.basicConfig(
 
 
 def fetch_page():
-    # Updated URL with capital 'A' in Action (matching working request)
-    url = "https://ws-edt-cd.wigorservices.net/WebPsDyn.aspx?Action=posEDTLMS&serverID=C&Tel=louis.marec&date=11/17/2025"
+    # Generate today's date in the format MM/DD/YYYY for the API
+    current_date = datetime.now().strftime('%m/%d/%Y')
+    url = f"https://ws-edt-cd.wigorservices.net/WebPsDyn.aspx?Action=posEDTLMS&serverID=C&Tel=louis.marec&date={current_date}"
+    logging.info(f"Using date: {current_date}")
 
     # Read cookie from file
-    with open('cookie', 'r') as f:
+    with open('data/cookie', 'r') as f:
         cookie_string = f.read().strip()
 
     # Parse cookies from the cookie string
@@ -117,8 +119,8 @@ def extract_events(soup):
 
                     if month_name in french_months:
                         month_num = french_months[month_name]
-                        # Use 2025 as year (from URL)
-                        year = 2025
+                        # Use current year
+                        year = datetime.now().year
 
                         try:
                             date_obj = datetime(year, month_num, day_num)
@@ -273,7 +275,7 @@ if __name__ == '__main__':
         # Sync to Google Calendar (unless --no-sync flag is set)
         if not args.no_sync:
             try:
-                from google_calendar_sync import sync_events_to_calendar
+                from scripts.google_calendar_sync import sync_events_to_calendar
 
                 logging.info("Starting Google Calendar sync...")
                 # Events now have individual dates, no need to ask

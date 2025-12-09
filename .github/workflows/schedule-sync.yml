@@ -27,9 +27,27 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Create cookie file from secrets
+      - name: Generate fresh cookies via automated login
         run: |
-          echo "${{ secrets.WIGOR_COOKIE }}" > cookie
+          # Create input for automated login script
+          echo "${{ secrets.WIGOR_USERNAME }}" > /tmp/login_input.txt
+          echo "${{ secrets.WIGOR_PASSWORD }}" >> /tmp/login_input.txt
+          echo "y" >> /tmp/login_input.txt
+          
+          # Run automated login
+          cat /tmp/login_input.txt | python scripts/wigor_login.py || {
+            echo "Automated login failed, checking for fallback cookie secret"
+            if [ -n "${{ secrets.WIGOR_COOKIE }}" ]; then
+              echo "Using fallback cookie from secrets"
+              echo "${{ secrets.WIGOR_COOKIE }}" > cookie
+            else
+              echo "ERROR: Both automated login and fallback cookie failed"
+              exit 1
+            fi
+          }
+          
+          # Clean up temporary file
+          rm -f /tmp/login_input.txt
 
       - name: Create Google credentials from secrets
         run: |

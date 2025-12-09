@@ -8,12 +8,28 @@ Automatically scrapes your schedule from WigorServices and syncs it to Google Ca
 # Install dependencies
 pip install -r requirements.txt
 
+# Generate fresh cookies (no more manual copying!)
+python scripts/wigor_login.py
+
 # Run the scraper (automatically syncs to Google Calendar)
 python main.py
 
 # Or scrape without syncing
 python main.py --no-sync
 ```
+
+### 🔄 Automatic Cookie Generation
+
+**No more manual cookie copying from browser DevTools!**
+
+The `wigor_login.py` script automates the entire login process:
+- Opens browser automatically
+- Logs in with your credentials
+- Captures cookies
+- Saves to `cookie` file
+- Verifies they work
+
+**See:** [docs/AUTO_LOGIN_GUIDE.md](docs/AUTO_LOGIN_GUIDE.md)
 
 ## 📁 Project Structure
 
