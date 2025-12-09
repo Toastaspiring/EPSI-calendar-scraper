@@ -14,21 +14,21 @@
 
 ---
 
-## 📖 Overview
+## Overview
 
 This project automates the tedious task of checking your school schedule. It logs into the **WigorServices** portal, extracts your course timetable, and seamlessly synchronizes it with your **Google Calendar**.
 
 Designed to be **"Set and Forget"**, it runs automatically via GitHub Actions every Monday morning, ensuring your calendar is always up-to-date with room numbers, professor names, and Microsoft Teams meeting links.
 
-## ✨ Key Features
+## Key Features
 
-*   **🔒 Automated Authentication**: Handles login via Selenium with headless browser support.
-*   **📅 Intelligent Sync**: Parses complex HTML schedules and maps them to Google Calendar events.
-*   **🔗 Rich Event Details**: Includes Class Name, Professor, Room Location, and clickable Teams links.
-*   **🤖 CI/CD Ready**: Pre-configured GitHub Actions workflow for zero-touch weekly automation.
-*   **�️ Robust Error Handling**: Auto-detects expired sessions and handles connection retries.
+*   **Automated Authentication**: Handles login via Selenium with headless browser support.
+*   **Intelligent Sync**: Parses complex HTML schedules and maps them to Google Calendar events.
+*   **Rich Event Details**: Includes Class Name, Professor, Room Location, and clickable Teams links.
+*   **CI/CD Ready**: Pre-configured GitHub Actions workflow for zero-touch weekly automation.
+*   **Robust Error Handling**: Auto-detects expired sessions and handles connection retries.
 
-## 🚀 Quick Start
+## Quick Start
 
 The fastest way to use this tool is via **GitHub Actions** (Cloud automation).
 
@@ -36,15 +36,15 @@ The fastest way to use this tool is via **GitHub Actions** (Cloud automation).
 2.  **Configure Secrets** (Wigor Credentials & Google OAuth).
 3.  **Enable the Workflow**.
 
-👉 **[Read the 5-Minute Setup Guide](docs/QUICKSTART.md)**
+**[Read the 5-Minute Setup Guide](docs/QUICKSTART.md)**
 
 ---
 
-## 🛠️ Usage Choices
+## Usage Choices
 
 ### Option A: Cloud Automation (Recommended)
 Run the scraper automatically on GitHub servers. No local machine required after initial setup.  
-**[View Automation Guide →](docs/QUICKSTART.md)**
+**[View Automation Guide ->](docs/QUICKSTART.md)**
 
 ### Option B: Local Execution
 Run the script manually on your own machine. Ideal for development or one-off syncs.  
@@ -55,25 +55,25 @@ python scripts/wigor_login.py
 # Run scraper
 python main.py
 ```
-**[View Technical Documentation →](docs/documentation.md)**
+**[View Technical Documentation ->](docs/documentation.md)**
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 .
-├── .github/workflows/   # 🤖 Automation workflows (Weekly Sync)
-├── docs/                # 📚 Comprehensive guides & reference
-├── scripts/             # 🔧 Core utilities (Login, Google API)
-├── data/                # 💾 Data artifacts (Cookies, Cache, JSON)
-└── main.py              # 🚀 Application entry point
+├── .github/workflows/   # Automation workflows (Weekly Sync)
+├── docs/                # Comprehensive guides & reference
+├── scripts/             # Core utilities (Login, Google API)
+├── data/                # Data artifacts (Cookies, Cache, JSON)
+└── main.py              # Application entry point
 ```
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## 📄 License
+## License
 
 This project is open-source and available under the [MIT License](LICENSE).
