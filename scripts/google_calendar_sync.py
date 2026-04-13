@@ -156,12 +156,19 @@ def build_event_body(event_data):
     ]
     description = '\n'.join(description_parts)
 
-    # Location: show "Distanciel" if the room name contains it, otherwise room as-is
+    # Location: prettify room name
+    #   "SALLE_02(DISTANCIEL)" -> "Distanciel"
+    #   "208-EPSI(ST EXUPERY)" -> "Salle 208 ( EPSI )"
     room = event_data.get('room', '')
     if 'distanciel' in room.lower():
         location = 'Distanciel'
     else:
-        location = room
+        import re
+        m = re.match(r'^(\d+)-(\w+)\(', room)
+        if m:
+            location = f"Salle {m.group(1)} ( {m.group(2)} )"
+        else:
+            location = room
 
     event = {
         'summary': event_data.get('course', 'No Title'),
