@@ -100,6 +100,43 @@ def parse_event_datetime(event_data):
     return start_dt, end_dt
 
 
+# Google Calendar event color palette (colorId -> RGB)
+_GCAL_COLORS = {
+    '1':  (121, 134, 203),  # Lavender
+    '2':  (51, 182, 121),   # Sage
+    '3':  (142, 36, 170),   # Grape
+    '4':  (230, 124, 115),  # Flamingo
+    '5':  (246, 191, 38),   # Banana
+    '6':  (244, 81, 30),    # Tangerine
+    '7':  (3, 155, 229),    # Peacock
+    '8':  (97, 97, 97),     # Graphite
+    '9':  (63, 81, 181),    # Blueberry
+    '10': (11, 128, 67),    # Basil
+    '11': (213, 0, 0),      # Tomato
+}
+
+
+def _closest_gcal_color(hex_color):
+    """
+    Find the Google Calendar colorId closest to the given hex color.
+    Uses simple Euclidean distance in RGB space.
+    """
+    try:
+        hex_color = hex_color.lstrip('#')
+        r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+    except (ValueError, IndexError):
+        return '9'  # default Blueberry
+
+    best_id = '9'
+    best_dist = float('inf')
+    for cid, (cr, cg, cb) in _GCAL_COLORS.items():
+        dist = (r - cr) ** 2 + (g - cg) ** 2 + (b - cb) ** 2
+        if dist < best_dist:
+            best_dist = dist
+            best_id = cid
+    return best_id
+
+
 def build_event_body(event_data):
     """
     Build a Google Calendar event body from scraped event data.
@@ -141,19 +178,9 @@ def build_event_body(event_data):
         },
     }
 
-    # Add color based on event color
-    color_mapping = {
-        '#FFDDFF': '1',  # Lavender
-        '#DDEEDD': '2',  # Sage
-        '#DDDDFF': '3',  # Grape
-        '#DDFFDD': '10', # Basil
-        '#EEDDEE': '4',  # Flamingo
-        '#DDDDEE': '3',  # Grape
-        '#EEEEEE': '8',  # Graphite
-    }
-
+    # Map event color to closest Google Calendar color ID
     if 'color' in event_data:
-        event['colorId'] = color_mapping.get(event_data['color'], '9')
+        event['colorId'] = _closest_gcal_color(event_data['color'])
 
     return event, start_dt, end_dt
 
@@ -207,6 +234,8 @@ def event_needs_update(existing_event, new_body):
     if existing_event.get('location', '') != new_body.get('location', ''):
         return True
     if existing_event.get('description', '') != new_body.get('description', ''):
+        return True
+    if new_body.get('colorId') and existing_event.get('colorId') != new_body.get('colorId'):
         return True
     # Check if end time changed
     existing_end = existing_event.get('end', {}).get('dateTime', '')
