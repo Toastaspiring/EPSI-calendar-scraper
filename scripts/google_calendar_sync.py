@@ -149,17 +149,23 @@ def build_event_body(event_data):
     """
     start_dt, end_dt = parse_event_datetime(event_data)
 
-    # Build event description
+    # Build event description (no Mode line - use location instead)
     description_parts = [
         f"Professor: {event_data.get('professor', 'N/A')}",
         f"Group: {event_data.get('group', 'N/A')}",
-        f"Mode: {event_data.get('mode', 'N/A')}"
     ]
     description = '\n'.join(description_parts)
 
+    # Location: show "Distanciel" if the room name contains it, otherwise room as-is
+    room = event_data.get('room', '')
+    if 'distanciel' in room.lower():
+        location = 'Distanciel'
+    else:
+        location = room
+
     event = {
         'summary': event_data.get('course', 'No Title'),
-        'location': event_data.get('room', ''),
+        'location': location,
         'description': description,
         'start': {
             'dateTime': start_dt.isoformat(),
