@@ -1,6 +1,5 @@
-# Basic web scraping dependencies
+# Core dependency (HTTP requests to JSON API)
 requests>=2.31.0
-beautifulsoup4>=4.12.0
 
 # Google Calendar API dependencies (optional)
 google-auth>=2.23.0
@@ -8,6 +7,8 @@ google-auth-oauthlib>=1.1.0
 google-auth-httplib2>=0.1.1
 google-api-python-client>=2.100.0
 
+# Outlook Calendar dependencies (optional)
+O365>=2.0.35
+
 # Automated login (optional)
 selenium>=4.15.0
-

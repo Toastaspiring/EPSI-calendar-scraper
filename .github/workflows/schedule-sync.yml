@@ -1,9 +1,9 @@
 name: Weekly Schedule Sync
 
 on:
-  # Run every Monday at 6:00 AM UTC
+  # Run every weekday at 6:00 AM UTC
   schedule:
-    - cron: '0 6 * * 1'
+    - cron: '0 6 * * 1-5'
 
   # Allow manual trigger from GitHub Actions tab
   workflow_dispatch:
@@ -85,10 +85,14 @@ jobs:
           fi
 
       - name: Run schedule scraper
-        run: |
-          python main.py
         env:
           PYTHONUNBUFFERED: 1
+          CALENDAR_PROVIDER: ${{ secrets.CALENDAR_PROVIDER || 'GOOGLE' }}
+          MS_CLIENT_ID: ${{ secrets.MS_CLIENT_ID }}
+          MS_CLIENT_SECRET: ${{ secrets.MS_CLIENT_SECRET }}
+          MS_TOKEN_BASE64: ${{ secrets.MS_TOKEN_BASE64 }}
+        run: |
+          python main.py
 
       - name: Upload log file
         if: always()
@@ -103,7 +107,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: events-json-${{ github.run_number }}
-          path: data/events.json
+          path: |
+            data/events.json
+            data/raw_api.json
           retention-days: 7
 
       - name: Save Google token cache

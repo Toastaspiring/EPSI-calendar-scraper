@@ -7,6 +7,7 @@ eliminating the need to manually copy them from browser DevTools.
 """
 
 import json
+import os
 import time
 import logging
 from datetime import datetime
@@ -26,6 +27,7 @@ logging.basicConfig(
 # Configuration
 WIGOR_URL = "https://ws-edt-cd.wigorservices.net/WebPsDyn.aspx?Action=posEDTLMS&serverID=C&Tel=louis.marec"
 CAS_LOGIN_URL = "https://cas-p.wigorservices.net/cas/login"
+API_TEST_URL = "https://ws-edt-cd.wigorservices.net/Home/Get"
 COOKIE_FILE = "data/cookie"
 COOKIE_JSON_FILE = "data/cookies_full.json"
 
@@ -165,11 +167,15 @@ def extract_cookies(driver):
     """
     Extract cookies from the browser session.
 
+    The new ASP.NET Core app may use different cookie names than the old system.
+    We capture all cookies from the wigorservices.net domain to ensure
+    authentication works regardless of cookie name changes.
+
     Args:
         driver: WebDriver instance
 
     Returns:
-        Dictionary of cookies
+        Tuple of (all_cookies, domain_cookies_dict)
     """
     logging.info("Extracting cookies...")
 
@@ -181,29 +187,27 @@ def extract_cookies(driver):
     for cookie in all_cookies:
         logging.debug(f"  - {cookie['name']}: {cookie['value'][:20]}...")
 
-    # Filter for important cookies
-    important_cookies = {
-        'ASP.NET_SessionId': None,
-        '.DotNetCasClientAuth': None
-    }
-
+    # Collect all cookies from the wigorservices.net domain
+    domain_cookies = {}
     for cookie in all_cookies:
-        if cookie['name'] in important_cookies:
-            important_cookies[cookie['name']] = cookie['value']
+        domain = cookie.get('domain', '')
+        if 'wigorservices.net' in domain:
+            domain_cookies[cookie['name']] = cookie['value']
 
-    return all_cookies, important_cookies
+    logging.info(f"Found {len(domain_cookies)} wigorservices cookies: {list(domain_cookies.keys())}")
+
+    return all_cookies, domain_cookies
 
 
-def save_cookies(all_cookies, important_cookies):
+def save_cookies(all_cookies, domain_cookies):
     """
     Save cookies to files.
 
     Args:
-        all_cookies: List of all cookies
-        important_cookies: Dictionary of important cookies
+        all_cookies: List of all cookies (Selenium format)
+        domain_cookies: Dictionary of wigorservices domain cookies
     """
     # Ensure data directory exists
-    import os
     os.makedirs('data', exist_ok=True)
 
     # Save all cookies as JSON (for reference)
@@ -211,21 +215,19 @@ def save_cookies(all_cookies, important_cookies):
         json.dump(all_cookies, f, indent=2)
     logging.info(f"All cookies saved to {COOKIE_JSON_FILE}")
 
-    # Save important cookies in the format needed by main.py
-    if important_cookies['ASP.NET_SessionId'] and important_cookies['.DotNetCasClientAuth']:
-        cookie_string = f"ASP.NET_SessionId={important_cookies['ASP.NET_SessionId']}; .DotNetCasClientAuth={important_cookies['.DotNetCasClientAuth']}"
+    # Save all domain cookies in the format needed by main.py
+    if domain_cookies:
+        cookie_string = '; '.join(f"{k}={v}" for k, v in domain_cookies.items())
 
         with open(COOKIE_FILE, 'w') as f:
             f.write(cookie_string)
 
         logging.info(f"Cookie file saved to {COOKIE_FILE}")
-        logging.info(f"Cookie preview: {cookie_string[:80]}...")
+        logging.info(f"Saved {len(domain_cookies)} cookies: {list(domain_cookies.keys())}")
 
         return True
     else:
-        logging.error("Required cookies not found!")
-        logging.error(f"ASP.NET_SessionId: {'Found' if important_cookies['ASP.NET_SessionId'] else 'Missing'}")
-        logging.error(f".DotNetCasClientAuth: {'Found' if important_cookies['.DotNetCasClientAuth'] else 'Missing'}")
+        logging.error("No wigorservices.net cookies found!")
         return False
 
 
@@ -247,20 +249,25 @@ def test_cookies(driver):
         test_url = f"https://ws-edt-cd.wigorservices.net/WebPsDyn.aspx?Action=posEDTLMS&serverID=C&Tel=louis.marec&date={current_date}"
 
         driver.get(test_url)
-        time.sleep(2)
+        time.sleep(3)
 
         # Check if we got redirected to login (cookies don't work)
         if "cas" in driver.current_url.lower() and "login" in driver.current_url.lower():
             logging.error("Cookies don't work - redirected to login")
             return False
 
-        # Check if we see schedule content
-        page_source = driver.page_source.lower()
-        if "connexion" in page_source and "authentication" in page_source:
+        # Check if we see the new Kendo Scheduler page
+        page_source = driver.page_source
+        if "kendoScheduler" in page_source or "Emploi du temps" in page_source:
+            logging.info("Cookies work! Successfully accessed new Kendo Scheduler page")
+            return True
+
+        # Fallback: check we're NOT on a login page
+        if "connexion" in page_source.lower() and "authentication" in page_source.lower():
             logging.error("Cookies don't work - seeing login page")
             return False
 
-        logging.info("✓ Cookies work! Successfully accessed schedule page")
+        logging.info("Cookies work! Successfully accessed schedule page")
         return True
 
     except Exception as e:
@@ -277,17 +284,32 @@ def main():
     print("="*60)
     print()
 
-    # Get credentials
-    print("Enter your WigorServices credentials:")
-    username = input("Username: ").strip()
-    password = input("Password: ").strip()
+    # Get credentials from env vars or interactive input
+    username = os.environ.get('WIGOR_USERNAME', '').strip()
+    password = os.environ.get('WIGOR_PASSWORD', '').strip()
+
+    if not username or not password:
+        print("Enter your WigorServices credentials:")
+        if not username:
+            username = input("Username: ").strip()
+        if not password:
+            password = input("Password: ").strip()
 
     if not username or not password:
         logging.error("Username and password are required")
         return 1
 
-    headless_input = input("\nRun in headless mode (no browser window)? (y/n): ").strip().lower()
-    headless = headless_input == 'y'
+    # Headless mode: from env var, CLI arg, or interactive
+    headless_env = os.environ.get('WIGOR_HEADLESS', '').strip().lower()
+    if headless_env:
+        headless = headless_env in ('1', 'true', 'y', 'yes')
+    elif '--headless' in sys.argv:
+        headless = True
+    elif sys.stdin and sys.stdin.isatty():
+        headless_input = input("\nRun in headless mode (no browser window)? (y/n): ").strip().lower()
+        headless = headless_input == 'y'
+    else:
+        headless = True
 
     driver = None
 
@@ -321,7 +343,7 @@ def main():
         print()
         print("="*60)
         if test_success:
-            print("✓ SUCCESS! Cookies captured and verified")
+            print("[OK] SUCCESS! Cookies captured and verified")
             print("="*60)
             print()
             print(f"Cookie file created: {COOKIE_FILE}")

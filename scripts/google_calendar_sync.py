@@ -6,7 +6,7 @@ This module handles authentication and syncing of events to Google Calendar.
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
@@ -58,124 +58,184 @@ def authenticate_google_calendar():
     return service
 
 
-def parse_event_datetime(date_str, time_str):
+def parse_event_datetime(event_data):
     """
-    Parse date and time strings into datetime objects.
+    Parse event datetime from either ISO format (new API) or legacy date+time strings.
 
     Args:
-        date_str: Date string (e.g., "11/17/2025")
-        time_str: Time range string (e.g., "09:00 - 12:30")
+        event_data: Event dictionary with either:
+            - 'start'/'end' ISO 8601 strings (new format)
+            - 'date' + 'time' strings (legacy format)
 
     Returns:
         Tuple of (start_datetime, end_datetime)
     """
-    # Parse the time range
-    start_time, end_time = time_str.split(' - ')
+    # Try new ISO format first
+    if 'start' in event_data and 'end' in event_data:
+        try:
+            start_dt = datetime.fromisoformat(event_data['start'])
+            end_dt = datetime.fromisoformat(event_data['end'])
+            # Strip timezone info for Google Calendar (we pass timezone separately)
+            return start_dt.replace(tzinfo=None), end_dt.replace(tzinfo=None)
+        except (ValueError, TypeError):
+            pass
 
-    # Parse date (format: MM/DD/YYYY or DD/MM/YYYY)
-    # Assuming MM/DD/YYYY based on the URL pattern
+    # Fall back to legacy date + time format
+    date_str = event_data.get('date', '')
+    time_str = event_data.get('time', '')
+
+    if not date_str or not time_str:
+        raise ValueError(f"Event has no parseable date/time: {event_data.get('course', 'Unknown')}")
+
+    start_time, end_time = time_str.split(' - ')
     date_parts = date_str.split('/')
     month, day, year = int(date_parts[0]), int(date_parts[1]), int(date_parts[2])
 
-    # Parse start time
     start_hour, start_min = map(int, start_time.split(':'))
     start_dt = datetime(year, month, day, start_hour, start_min)
 
-    # Parse end time
     end_hour, end_min = map(int, end_time.split(':'))
     end_dt = datetime(year, month, day, end_hour, end_min)
 
     return start_dt, end_dt
 
 
-def create_calendar_event(service, event_data, event_date):
+def build_event_body(event_data):
     """
-    Create a single event in Google Calendar.
+    Build a Google Calendar event body from scraped event data.
 
     Args:
-        service: Google Calendar service object
         event_data: Dictionary containing event information
-        event_date: Date string for the event (e.g., "11/17/2025")
 
     Returns:
-        Created event object or None if failed
+        Tuple of (event_body dict, start_dt, end_dt) or None on failure
     """
-    try:
-        # Parse datetime
-        start_dt, end_dt = parse_event_datetime(event_date, event_data['time'])
+    start_dt, end_dt = parse_event_datetime(event_data)
 
-        # Build event description
-        description_parts = [
-            f"Professor: {event_data.get('professor', 'N/A')}",
-            f"Group: {event_data.get('group', 'N/A')}",
-            f"Mode: {event_data.get('mode', 'N/A')}"
-        ]
+    # Build event description
+    description_parts = [
+        f"Professor: {event_data.get('professor', 'N/A')}",
+        f"Group: {event_data.get('group', 'N/A')}",
+        f"Mode: {event_data.get('mode', 'N/A')}"
+    ]
+    description = '\n'.join(description_parts)
 
-        if 'teams_links' in event_data and event_data['teams_links']:
-            description_parts.append("\nTeams Links:")
-            for link in event_data['teams_links']:
-                link_type = link.get('type', 'Unknown').replace('MTeams_', '')
-                description_parts.append(f"- {link_type}: {link.get('url', '')}")
+    event = {
+        'summary': event_data.get('course', 'No Title'),
+        'location': event_data.get('room', ''),
+        'description': description,
+        'start': {
+            'dateTime': start_dt.isoformat(),
+            'timeZone': 'Europe/Paris',
+        },
+        'end': {
+            'dateTime': end_dt.isoformat(),
+            'timeZone': 'Europe/Paris',
+        },
+        'reminders': {
+            'useDefault': False,
+            'overrides': [
+                {'method': 'popup', 'minutes': 30},
+                {'method': 'popup', 'minutes': 10},
+            ],
+        },
+    }
 
-        description = '\n'.join(description_parts)
+    # Add color based on event color
+    color_mapping = {
+        '#FFDDFF': '1',  # Lavender
+        '#DDEEDD': '2',  # Sage
+        '#DDDDFF': '3',  # Grape
+        '#DDFFDD': '10', # Basil
+        '#EEDDEE': '4',  # Flamingo
+        '#DDDDEE': '3',  # Grape
+        '#EEEEEE': '8',  # Graphite
+    }
 
-        # Create event
-        event = {
-            'summary': event_data.get('course', 'No Title'),
-            'location': event_data.get('room', ''),
-            'description': description,
-            'start': {
-                'dateTime': start_dt.isoformat(),
-                'timeZone': 'Europe/Paris',
-            },
-            'end': {
-                'dateTime': end_dt.isoformat(),
-                'timeZone': 'Europe/Paris',
-            },
-            'reminders': {
-                'useDefault': False,
-                'overrides': [
-                    {'method': 'popup', 'minutes': 30},
-                    {'method': 'popup', 'minutes': 10},
-                ],
-            },
-        }
+    if 'color' in event_data:
+        event['colorId'] = color_mapping.get(event_data['color'], '9')
 
-        # Add color based on event color
-        color_mapping = {
-            '#FFDDFF': '1',  # Lavender
-            '#DDEEDD': '2',  # Sage
-            '#DDDDFF': '3',  # Grape
-            '#DDFFDD': '10', # Basil
-            '#EEDDEE': '4',  # Flamingo
-            '#DDDDEE': '3',  # Grape
-            '#EEEEEE': '8',  # Graphite
-        }
-
-        if 'color' in event_data:
-            event['colorId'] = color_mapping.get(event_data['color'], '9')
-
-        # Insert event into primary calendar
-        created_event = service.events().insert(calendarId='primary', body=event).execute()
-
-        return created_event
-
-    except Exception as e:
-        logging.error(f"Error creating event '{event_data.get('course', 'Unknown')}': {e}")
-        return None
+    return event, start_dt, end_dt
 
 
-def sync_events_to_calendar(events_file='data/events.json', event_date=None):
+def fetch_existing_events(service, time_min, time_max):
     """
-    Sync all events from JSON file to Google Calendar.
+    Fetch all existing events from Google Calendar in the given time range.
+
+    Returns:
+        Dict mapping (summary, start_iso) -> event object
+    """
+    time_min_iso = time_min.isoformat() + '+02:00'
+    time_max_iso = time_max.isoformat() + '+02:00'
+
+    logging.info(f"Fetching existing calendar events from {time_min_iso} to {time_max_iso}")
+
+    existing = {}
+    page_token = None
+
+    while True:
+        result = service.events().list(
+            calendarId='primary',
+            timeMin=time_min_iso,
+            timeMax=time_max_iso,
+            singleEvents=True,
+            orderBy='startTime',
+            maxResults=250,
+            pageToken=page_token,
+        ).execute()
+
+        for ev in result.get('items', []):
+            summary = ev.get('summary', '')
+            start = ev['start'].get('dateTime', ev['start'].get('date', ''))
+            key = (summary, start)
+            existing[key] = ev
+
+        page_token = result.get('nextPageToken')
+        if not page_token:
+            break
+
+    logging.info(f"Found {len(existing)} existing events in range")
+    return existing
+
+
+def event_needs_update(existing_event, new_body):
+    """
+    Check if an existing Google Calendar event differs from the new data.
+
+    Compares: location (room), description (professor/group/mode).
+    """
+    if existing_event.get('location', '') != new_body.get('location', ''):
+        return True
+    if existing_event.get('description', '') != new_body.get('description', ''):
+        return True
+    # Check if end time changed
+    existing_end = existing_event.get('end', {}).get('dateTime', '')
+    new_end = new_body.get('end', {}).get('dateTime', '')
+    if existing_end and new_end:
+        # Normalize for comparison (strip timezone offset differences)
+        try:
+            if datetime.fromisoformat(existing_end) != datetime.fromisoformat(new_end + '+02:00' if '+' not in new_end else new_end):
+                return True
+        except (ValueError, TypeError):
+            pass
+    return False
+
+
+def sync_events_to_calendar(events_file='data/events.json'):
+    """
+    Sync all events from JSON file to Google Calendar using upsert logic.
+
+    - If event does not exist: create it
+    - If event exists but data changed: update it
+    - If event exists and is identical: skip it
+
+    Events are matched by (summary, start_datetime).
 
     Args:
         events_file: Path to JSON file with events
-        event_date: Date string for events (e.g., "11/17/2025")
-                   If None, each event's individual date will be used
 
     Returns:
-        Number of events successfully created
+        Number of events created or updated
     """
     # Authenticate
     logging.info("Authenticating with Google Calendar...")
@@ -192,44 +252,72 @@ def sync_events_to_calendar(events_file='data/events.json', event_date=None):
 
     logging.info(f"Found {len(events)} events to sync")
 
-    # Check if events have individual dates
-    events_with_dates = [e for e in events if 'date' in e]
+    # Parse all events and compute the time range
+    parsed_events = []
+    for event_data in events:
+        has_dates = ('start' in event_data and 'end' in event_data) or ('date' in event_data and 'time' in event_data)
+        if not has_dates:
+            continue
+        try:
+            body, start_dt, end_dt = build_event_body(event_data)
+            parsed_events.append((event_data, body, start_dt, end_dt))
+        except Exception as e:
+            logging.warning(f"Skipping unparseable event: {event_data.get('course', '?')}: {e}")
 
-    if events_with_dates:
-        logging.info(f"Events span multiple dates - using individual event dates")
-    elif not event_date:
-        # For cron jobs, if no date is provided and events don't have dates, fail
-        logging.error("Events do not have individual dates and no date was provided")
+    if not parsed_events:
+        logging.warning("No valid events to sync")
         return 0
 
-    # Create events
-    logging.info(f"Creating events in Google Calendar...")
+    # Compute time range for fetching existing events (with 1h buffer)
+    all_starts = [s for _, _, s, _ in parsed_events]
+    all_ends = [e for _, _, _, e in parsed_events]
+    range_min = min(all_starts) - timedelta(hours=1)
+    range_max = max(all_ends) + timedelta(hours=1)
+
+    # Fetch existing events in that range
+    existing = fetch_existing_events(service, range_min, range_max)
+
+    # Upsert loop
     created_count = 0
+    updated_count = 0
+    skipped_count = 0
     failed_count = 0
 
-    for i, event in enumerate(events, 1):
-        # Use event's date if available, otherwise use the provided date
-        date_to_use = event.get('date', event_date)
+    for event_data, body, start_dt, end_dt in parsed_events:
+        course = event_data.get('course', 'Unknown')
+        # Build the lookup key matching what Google Calendar returns
+        start_iso = start_dt.isoformat() + '+02:00'
+        key = (body['summary'], start_iso)
 
-        if not date_to_use:
-            logging.warning(f"Skipping event {i}/{len(events)}: {event.get('course', 'Unknown')} (no date)")
+        try:
+            if key in existing:
+                # Event exists - check if it needs updating
+                existing_event = existing[key]
+                if event_needs_update(existing_event, body):
+                    service.events().update(
+                        calendarId='primary',
+                        eventId=existing_event['id'],
+                        body=body,
+                    ).execute()
+                    logging.info(f"Updated: {course} on {start_dt.strftime('%m/%d')}")
+                    updated_count += 1
+                else:
+                    logging.info(f"Skipped (unchanged): {course} on {start_dt.strftime('%m/%d')}")
+                    skipped_count += 1
+            else:
+                # Event does not exist - create it
+                service.events().insert(calendarId='primary', body=body).execute()
+                logging.info(f"Created: {course} on {start_dt.strftime('%m/%d')}")
+                created_count += 1
+        except Exception as e:
+            logging.error(f"Failed: {course} on {start_dt.strftime('%m/%d')}: {e}")
             failed_count += 1
-            continue
 
-        logging.debug(f"Creating event {i}/{len(events)}: {event.get('course', 'Unknown')} on {date_to_use}")
-
-        created = create_calendar_event(service, event, date_to_use)
-
-        if created:
-            logging.info(f"✓ Created: {event.get('course', 'Unknown')} on {date_to_use}")
-            created_count += 1
-        else:
-            logging.error(f"✗ Failed: {event.get('course', 'Unknown')} on {date_to_use}")
-            failed_count += 1
-
-    logging.info(f"Successfully created {created_count}/{len(events)} events ({failed_count} failed)")
-
-    return created_count
+    logging.info(
+        f"Sync complete: {created_count} created, {updated_count} updated, "
+        f"{skipped_count} unchanged, {failed_count} failed"
+    )
+    return created_count + updated_count
 
 
 def list_upcoming_events(service, max_results=10):
@@ -263,13 +351,5 @@ def list_upcoming_events(service, max_results=10):
 
 
 if __name__ == '__main__':
-    # Example usage
-    import sys
-
-    if len(sys.argv) > 1:
-        date_arg = sys.argv[1]
-    else:
-        date_arg = None
-
-    sync_events_to_calendar(event_date=date_arg)
+    sync_events_to_calendar()
 

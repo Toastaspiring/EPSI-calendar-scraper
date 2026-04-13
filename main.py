@@ -1,9 +1,7 @@
 import requests
-from bs4 import BeautifulSoup
 import json
-import re
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import sys
 
@@ -18,204 +16,224 @@ logging.basicConfig(
     ]
 )
 
+# Base URL for the new Kendo UI scheduler API
+BASE_URL = "https://ws-edt-cd.wigorservices.net"
+SCHEDULE_PAGE_URL = f"{BASE_URL}/WebPsDyn.aspx?Action=posEDTLMS&serverID=C&Tel=louis.marec"
+API_URL = f"{BASE_URL}/Home/Get"
 
-def fetch_page():
-    # Generate today's date in the format MM/DD/YYYY for the API
-    current_date = datetime.now().strftime('%m/%d/%Y')
-    url = f"https://ws-edt-cd.wigorservices.net/WebPsDyn.aspx?Action=posEDTLMS&serverID=C&Tel=louis.marec&date={current_date}"
-    logging.info(f"Using date: {current_date}")
 
-    # Read cookie from file
+def load_cookies():
+    """
+    Load authentication cookies from file.
+
+    The cookie file should contain cookies in 'name=value; name=value' format.
+
+    Returns:
+        Dictionary of cookies
+    """
     with open('data/cookie', 'r') as f:
         cookie_string = f.read().strip()
 
-    # Parse cookies from the cookie string
     cookies = {}
     for cookie in cookie_string.split('; '):
         if '=' in cookie:
             name, value = cookie.split('=', 1)
             cookies[name] = value
 
-    logging.info(f"Using cookies: {list(cookies.keys())}")
+    logging.info(f"Loaded cookies: {list(cookies.keys())}")
+    return cookies
 
-    # Set up headers to match the working browser request
-    headers = {
+
+def get_session_headers():
+    """
+    Return headers for API requests.
+    """
+    return {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
         'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br, zstd',
-        'sec-ch-ua': '"Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': '"Windows"',
-        'sec-fetch-dest': 'document',
-        'sec-fetch-mode': 'navigate',
-        'sec-fetch-site': 'none',
-        'sec-fetch-user': '?1',
-        'upgrade-insecure-requests': '1'
+        'X-Requested-With': 'XMLHttpRequest',
+        'Referer': SCHEDULE_PAGE_URL,
     }
 
-    # Fetch the page
-    logging.info(f"Fetching schedule from: {url}")
-    response = requests.get(url, headers=headers, cookies=cookies, allow_redirects=True)
-    response.raise_for_status()
 
-    logging.info(f"Final URL: {response.url}")
-    logging.info(f"Page fetched successfully. Status code: {response.status_code}")
-
-    # Parse with BeautifulSoup
-    soup = BeautifulSoup(response.text, 'html.parser')
-
-    # Check if we got a login page
-    if 'Connexion' in (soup.title.string if soup.title else ''):
-        logging.error("Received a login page. Cookies have expired!")
-        logging.error("Update the 'cookie' file with fresh credentials from browser")
-        raise Exception("Authentication failed - cookies expired")
-    else:
-        logging.info("Successfully authenticated and got schedule page")
-
-    # Save raw HTML
-    os.makedirs('data', exist_ok=True)
-    with open('data/raw', 'w', encoding='utf-8') as f:
-        f.write(soup.prettify())
-
-    return soup
-
-
-def extract_events(soup):
+def verify_auth(session):
     """
-    Extract all calendar events from the parsed HTML.
+    Verify authentication by loading the schedule page.
+    Follows CAS redirects, which also warms up the session.
 
     Returns:
-        List of dictionaries containing event information
+        True if authenticated, False otherwise
+    """
+    logging.info("Verifying authentication...")
+    current_date = datetime.now().strftime('%m/%d/%Y')
+    url = f"{SCHEDULE_PAGE_URL}&date={current_date}"
+
+    response = session.get(url, allow_redirects=True)
+    response.raise_for_status()
+
+    # Check if we got redirected to a CAS login page
+    if 'cas' in response.url.lower() and 'login' in response.url.lower():
+        logging.error("Redirected to CAS login page. Cookies have expired!")
+        logging.error("Update the 'data/cookie' file with fresh credentials from browser")
+        raise Exception("Authentication failed - cookies expired")
+
+    # Check page title for the new scheduler page
+    if 'Emploi du temps' in response.text or 'kendoScheduler' in response.text:
+        logging.info("Successfully authenticated (new Kendo Scheduler UI)")
+        return True
+
+    # Fallback: check if we're NOT on a login page
+    if 'Connexion' not in response.text and 'login' not in response.text.lower():
+        logging.info("Successfully authenticated")
+        return True
+
+    logging.error("Authentication check failed - unexpected page content")
+    raise Exception("Authentication failed - unexpected page content")
+
+
+def fetch_events(date=None):
+    """
+    Fetch events from the new JSON API.
+
+    The new calendar uses a Kendo UI Scheduler that loads events via
+    /Home/Get with dateDebut and dateFin query parameters (ISO 8601 UTC).
+
+    Args:
+        date: Target date (datetime object). Defaults to today.
+
+    Returns:
+        List of event dictionaries in normalized format
+    """
+    if date is None:
+        date = datetime.now()
+
+    # Compute the week range (Monday to Friday)
+    # The Kendo scheduler sends dates in UTC.
+    # For Europe/Paris (UTC+1 or UTC+2), the start of Monday is Sunday 22:00 or 23:00 UTC.
+    weekday = date.weekday()  # 0=Monday
+    monday = date - timedelta(days=weekday)
+    friday = monday + timedelta(days=4)
+
+    # Use midnight-to-midnight in local time, shifted to UTC (approx UTC-2 for CEST)
+    # The API expects ISO 8601 UTC timestamps. The Kendo scheduler sends:
+    # dateDebut = start of Monday (local) in UTC, dateFin = end of Friday (local) in UTC
+    # We approximate by sending the full Monday-Friday range with some buffer
+    date_debut = (monday - timedelta(hours=2)).strftime('%Y-%m-%dT22:00:00.000Z')
+    # Use previous day at 22:00 UTC = midnight CEST
+    date_debut = (monday - timedelta(days=1)).strftime('%Y-%m-%dT22:00:00.000Z')
+    date_fin = (friday).strftime('%Y-%m-%dT22:00:00.000Z')
+
+    logging.info(f"Target date: {date.strftime('%Y-%m-%d')}")
+    logging.info(f"Fetching week: {monday.strftime('%Y-%m-%d')} to {friday.strftime('%Y-%m-%d')}")
+
+    # Load cookies and create session
+    cookies = load_cookies()
+    session = requests.Session()
+    session.cookies.update(cookies)
+    session.headers.update(get_session_headers())
+
+    # Verify authentication first (also warms up the session)
+    verify_auth(session)
+
+    # Call the JSON API
+    params = {
+        'sort': '',
+        'group': '',
+        'filter': '',
+        'dateDebut': date_debut,
+        'dateFin': date_fin,
+    }
+
+    logging.info(f"Fetching events from API: {API_URL}")
+    logging.info(f"  dateDebut={date_debut}, dateFin={date_fin}")
+
+    response = session.get(API_URL, params=params)
+    response.raise_for_status()
+
+    data = response.json()
+
+    if 'Data' not in data:
+        logging.error(f"Unexpected API response format: {list(data.keys())}")
+        raise Exception("Unexpected API response - missing 'Data' key")
+
+    raw_events = data['Data']
+    logging.info(f"API returned {len(raw_events)} raw events")
+
+    # Save raw API response for debugging
+    os.makedirs('data', exist_ok=True)
+    with open('data/raw_api.json', 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    logging.info("Raw API response saved to data/raw_api.json")
+
+    # Normalize events to a consistent format
+    events = normalize_events(raw_events)
+    return events
+
+
+def normalize_events(raw_events):
+    """
+    Convert raw API events to a normalized format compatible with
+    both the old format and calendar sync scripts.
+
+    The new API returns:
+        - Commentaire: course name (displayed as title)
+        - Start/End: ISO 8601 timestamps with timezone
+        - NomProf: professor name
+        - Salles: room
+        - LibelleGroupe: group label
+        - CoursMixteInfoBulle: mode (Presentiel/Distanciel/Mixte)
+        - ColorRed/Green/Blue: event color
+        - TeamsUrl: Teams link HTML (or null)
+        - Title: group name (not the course name!)
+        - Matiere: often "COMMENTAIRE" when course is in Commentaire field
+
+    Returns:
+        List of normalized event dictionaries
     """
     events = []
 
-    # First, extract day headers with their positions to map dates
-    day_headers = {}
-    jour_divs = soup.find_all('div', class_='Jour')
+    for raw in raw_events:
+        # Use Commentaire as course name (this is what the Kendo template uses)
+        course = raw.get('Commentaire') or raw.get('Matiere') or 'Unknown'
 
-    french_months = {
-        'janvier': 1, 'février': 2, 'mars': 3, 'avril': 4,
-        'mai': 5, 'juin': 6, 'juillet': 7, 'août': 8,
-        'septembre': 9, 'octobre': 10, 'novembre': 11, 'décembre': 12
-    }
+        # Parse ISO timestamps
+        start_str = raw.get('Start', '')
+        end_str = raw.get('End', '')
 
-    for jour_div in jour_divs:
-        style = jour_div.get('style', '')
-        # Extract left position
-        left_match = re.search(r'left:([\d.]+)%', style)
-        if left_match:
-            left_pos = float(left_match.group(1))
+        event = {
+            'course': course,
+            'start': start_str,
+            'end': end_str,
+            'professor': raw.get('NomProf') or 'N/A',
+            'group': raw.get('LibelleGroupe') or raw.get('Title') or 'N/A',
+            'room': raw.get('Salles') or 'N/A',
+            'mode': raw.get('CoursMixteInfoBulle') or 'N/A',
+        }
 
-            # Extract date from the day header
-            tcjour = jour_div.find('td', class_='TCJour')
-            if tcjour:
-                day_text = tcjour.get_text(strip=True)
-                # Parse format like "Lundi 17 Novembre"
-                date_match = re.search(r'(\d+)\s+(\w+)', day_text)
-                if date_match:
-                    day_num = int(date_match.group(1))
-                    month_name = date_match.group(2).lower()
+        # Build color hex from RGB
+        r = raw.get('ColorRed')
+        g = raw.get('ColorGreen')
+        b = raw.get('ColorBlue')
+        if r is not None and g is not None and b is not None:
+            event['color'] = f'#{r:02X}{g:02X}{b:02X}'
 
-                    if month_name in french_months:
-                        month_num = french_months[month_name]
-                        # Use current year
-                        year = datetime.now().year
+        # Backward compatibility: date and time fields
+        # Parse start/end ISO strings to extract date (MM/DD/YYYY) and time (HH:MM - HH:MM)
+        try:
+            start_dt = datetime.fromisoformat(start_str)
+            end_dt = datetime.fromisoformat(end_str)
+            event['date'] = start_dt.strftime('%m/%d/%Y')
+            event['time'] = f"{start_dt.strftime('%H:%M')} - {end_dt.strftime('%H:%M')}"
+        except (ValueError, TypeError):
+            logging.warning(f"Could not parse dates for event: {course}")
 
-                        try:
-                            date_obj = datetime(year, month_num, day_num)
-                            day_headers[left_pos] = date_obj.strftime('%m/%d/%Y')
-                        except ValueError:
-                            pass
+        # Teams links
+        teams_url = raw.get('TeamsUrl')
+        if teams_url:
+            event['teams_url'] = teams_url
 
-    # Find all event divs with class="Case"
-    case_divs = soup.find_all('div', class_='Case')
-
-    for case in case_divs:
-        # Skip shadow divs and other non-event Cases
-        if 'id' in case.attrs and case['id'] == 'Apres':
-            continue
-
-        # Find the table with event details
-        table = case.find('table', class_='TCase')
-        if not table:
-            continue
-
-        event = {}
-
-        # Extract date based on position
-        style = case.get('style', '')
-        left_match = re.search(r'left:([\d.]+)%', style)
-        if left_match:
-            event_left = float(left_match.group(1))
-
-            # Find the closest day header position
-            closest_day_pos = None
-            min_diff = float('inf')
-            for day_pos in day_headers.keys():
-                diff = abs(event_left - day_pos)
-                if diff < min_diff:
-                    min_diff = diff
-                    closest_day_pos = day_pos
-
-            if closest_day_pos is not None:
-                event['date'] = day_headers[closest_day_pos]
-
-        # Extract course name (first TCase td)
-        course_cell = table.find('td', class_='TCase')
-        if course_cell:
-            # Remove Teams div content to get clean course name
-            teams_div = course_cell.find('div', class_='Teams')
-            if teams_div:
-                teams_div.decompose()
-            presence_div = course_cell.find('div', class_='Presence')
-            if presence_div:
-                presence_div.decompose()
-            event['course'] = course_cell.get_text(strip=True)
-
-            # Extract Teams links
-            teams_div = case.find('div', class_='Teams')
-            if teams_div:
-                teams_links = []
-                for link in teams_div.find_all('a'):
-                    teams_links.append({
-                        'url': link.get('href', ''),
-                        'type': link.find('img').get('src', '').split('/')[-1].replace('.png', '') if link.find('img') else ''
-                    })
-                event['teams_links'] = teams_links
-
-        # Extract professor and group info
-        prof_cell = table.find('td', class_='TCProf')
-        if prof_cell:
-            # Check for presence/remote mode
-            mode_img = prof_cell.find('img')
-            if mode_img:
-                event['mode'] = mode_img.get('title', mode_img.get('alt', ''))
-
-            text_content = prof_cell.get_text('\n', strip=True).split('\n')
-            if len(text_content) > 0:
-                event['professor'] = text_content[0]
-            if len(text_content) > 1:
-                event['group'] = text_content[1]
-
-        # Extract time
-        time_cell = table.find('td', class_='TChdeb')
-        if time_cell:
-            event['time'] = time_cell.get_text(strip=True)
-
-        # Extract room
-        room_cell = table.find('td', class_='TCSalle')
-        if room_cell:
-            event['room'] = room_cell.get_text(strip=True).replace('Salle:', '').strip()
-
-        # Extract background color to determine event type
-        if 'background-color:' in style:
-            color = style.split('background-color:')[1].split(';')[0].strip()
-            event['color'] = color
-
-        # Only add if we have at least a course name
-        if 'course' in event:
-            events.append(event)
+        events.append(event)
 
     return events
 
@@ -235,8 +253,6 @@ def print_events(events):
         logging.debug(f"  Professor: {event.get('professor', 'N/A')}")
         logging.debug(f"  Room: {event.get('room', 'N/A')}")
         logging.debug(f"  Mode: {event.get('mode', 'N/A')}")
-        if 'teams_links' in event:
-            logging.debug(f"  Teams Links: {len(event['teams_links'])} available")
 
 
 def save_events_to_json(events, filename='data/events.json'):
@@ -257,38 +273,57 @@ if __name__ == '__main__':
     import argparse
 
     # Parse command-line arguments
-    parser = argparse.ArgumentParser(description='Scrape schedule and optionally sync to Google Calendar')
-    parser.add_argument('--no-sync', action='store_true', help='Skip Google Calendar sync')
+    parser = argparse.ArgumentParser(description='Scrape schedule and optionally sync to Google/Outlook Calendar')
+    parser.add_argument('--no-sync', action='store_true', help='Skip Calendar sync')
     parser.add_argument('--sync-only', action='store_true', help='Only sync existing events.json, skip scraping')
+    parser.add_argument('--provider', type=str, choices=['GOOGLE', 'OUTLOOK', 'BOTH'],
+                        help='Calendar provider (overrides CALENDAR_PROVIDER env var)')
     args = parser.parse_args()
+
+    # Determine provider
+    provider = args.provider or os.environ.get('CALENDAR_PROVIDER', 'GOOGLE')
+    provider = provider.upper()
 
     try:
         if not args.sync_only:
-            # Scrape schedule
+            # Fetch schedule via API
             logging.info("Starting schedule scraper...")
-            soup = fetch_page()
-            events = extract_events(soup)
+            events = fetch_events()
             print_events(events)
             save_events_to_json(events)
             logging.info("Scraping completed successfully")
 
-        # Sync to Google Calendar (unless --no-sync flag is set)
+        # Sync to Calendar (unless --no-sync flag is set)
         if not args.no_sync:
-            try:
-                from scripts.google_calendar_sync import sync_events_to_calendar
+            # Sync Google
+            if provider in ['GOOGLE', 'BOTH']:
+                try:
+                    from scripts.google_calendar_sync import sync_events_to_calendar
+                    logging.info("Starting Google Calendar sync...")
+                    created_count = sync_events_to_calendar()
+                    logging.info(f"Google Calendar sync completed: {created_count} events created")
+                except ImportError:
+                    logging.error("Google Calendar module not available.")
+                except Exception as e:
+                    logging.error(f"Error syncing to Google Calendar: {e}")
 
-                logging.info("Starting Google Calendar sync...")
-                # Events now have individual dates, no need to ask
-                created_count = sync_events_to_calendar()
-                logging.info(f"Google Calendar sync completed: {created_count} events created")
-            except ImportError:
-                logging.error("Google Calendar module not available.")
-                logging.error("Install required packages: pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client")
-            except Exception as e:
-                logging.error(f"Error syncing to Google Calendar: {e}")
-                raise
+            # Sync Outlook
+            if provider in ['OUTLOOK', 'BOTH']:
+                try:
+                    from scripts.outlook_calendar_sync import sync_events_to_outlook
+                    logging.info("Starting Outlook Calendar sync...")
+                    # Load events
+                    with open('data/events.json', 'r', encoding='utf-8') as f:
+                        events_data = json.load(f)
+
+                    created_count = sync_events_to_outlook(events_data)
+                    logging.info(f"Outlook Calendar sync completed: {created_count} events created")
+                except ImportError:
+                    logging.error("Outlook module not available. Install O365.")
+                except Exception as e:
+                    logging.error(f"Error syncing to Outlook: {e}")
         else:
-            logging.info("Skipping Google Calendar sync (--no-sync flag set)")
+            logging.info("Skipping Calendar sync (--no-sync flag set)")
 
         logging.info("All operations completed successfully")
         sys.exit(0)
@@ -296,4 +331,3 @@ if __name__ == '__main__':
     except Exception as e:
         logging.error(f"Fatal error: {e}", exc_info=True)
         sys.exit(1)
-
