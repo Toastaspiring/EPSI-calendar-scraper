@@ -166,7 +166,7 @@ def build_event_body(event_data):
         import re
         m = re.match(r'^(\d+)-(\w+)\(', room)
         if m:
-            location = f"Salle {m.group(1)} ( {m.group(2)} )"
+            location = f"Salle {m.group(1)} ({m.group(2)})"
         else:
             location = room
 
