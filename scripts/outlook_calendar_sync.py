@@ -8,7 +8,7 @@ using the Microsoft Graph API via the O365 library.
 import logging
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 
 try:
@@ -90,7 +90,14 @@ def parse_event_datetime(event_data: Dict[str, Any]):
         try:
             start_dt = datetime.fromisoformat(event_data['start'])
             end_dt = datetime.fromisoformat(event_data['end'])
-            return start_dt.replace(tzinfo=None), end_dt.replace(tzinfo=None)
+            # Wigor's Kendo scheduler is configured with timezone "Etc/UTC",
+            # so its displayed wall-time is the UTC value. Convert to UTC
+            # then drop tzinfo so the value we sync matches what Wigor shows.
+            if start_dt.tzinfo is not None:
+                start_dt = start_dt.astimezone(timezone.utc).replace(tzinfo=None)
+            if end_dt.tzinfo is not None:
+                end_dt = end_dt.astimezone(timezone.utc).replace(tzinfo=None)
+            return start_dt, end_dt
         except (ValueError, TypeError):
             pass
 

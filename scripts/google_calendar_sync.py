@@ -75,8 +75,16 @@ def parse_event_datetime(event_data):
         try:
             start_dt = datetime.fromisoformat(event_data['start'])
             end_dt = datetime.fromisoformat(event_data['end'])
-            # Strip timezone info for Google Calendar (we pass timezone separately)
-            return start_dt.replace(tzinfo=None), end_dt.replace(tzinfo=None)
+            # Wigor's Kendo scheduler is configured with timezone "Etc/UTC",
+            # so the wall-time users see on Wigor is the UTC value, not the
+            # +02:00 offset value. Convert to UTC then drop tzinfo so that
+            # when we pass timeZone=Europe/Paris to Google, the displayed
+            # hour matches what Wigor shows.
+            if start_dt.tzinfo is not None:
+                start_dt = start_dt.astimezone(timezone.utc).replace(tzinfo=None)
+            if end_dt.tzinfo is not None:
+                end_dt = end_dt.astimezone(timezone.utc).replace(tzinfo=None)
+            return start_dt, end_dt
         except (ValueError, TypeError):
             pass
 
