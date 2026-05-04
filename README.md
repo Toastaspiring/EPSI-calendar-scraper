@@ -6,6 +6,7 @@
 ![GitHub Actions](https://img.shields.io/badge/github%20actions-automated-green.svg)
 ![Outlook](https://img.shields.io/badge/Outlook-Supported-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)
+[![Weekly Schedule Sync](https://github.com/Toastaspiring/EPSI-calendar-scraper/actions/workflows/schedule-sync.yml/badge.svg)](https://github.com/Toastaspiring/EPSI-calendar-scraper/actions/workflows/schedule-sync.yml)
 
 **A robust, automated solution to sync your EPSI/WIS schedule directly to Google or Outlook Calendar.**
 
